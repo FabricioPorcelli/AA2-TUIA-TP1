@@ -6,8 +6,6 @@
 - Grimaldi, Damián  
 - Porcelli, Fabricio  
 
----
-
 ## Descripción
 Este repositorio contiene la resolución del **Trabajo Práctico N°1** de la materia **Aprendizaje Automático II (AA2)** de la **Tecnicatura Universitaria en Inteligencia Artificial**.
 
@@ -16,7 +14,6 @@ El trabajo se compone de tres ejercicios:
 - **Ejercicio 2:** Implementado en **Python local**, utilizando un entorno virtual y las librerías detalladas más abajo.  
 - **Ejercicio 3:** Implementado y ejecutado en **Google Colab**.  
 
----
 
 ## Instrucciones de instalación
 
@@ -41,5 +38,3 @@ Una vez activado el entorno virtual, se deben instalar las dependencias del arch
 ```
 pip install -r requirements.txt
 ```
-
----
