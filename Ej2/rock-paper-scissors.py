@@ -25,7 +25,7 @@ mp_drawing = mp.solutions.drawing_utils
 # Inicialización del detector de manos
 hands = mp_hands.Hands(
     static_image_mode=False,          # Detección continua en video
-    max_num_hands=1,                  # Detectar solo una mano
+    max_num_hands=2,                  # Detectar solo una mano
     min_detection_confidence=0.7,     # Confianza mínima para detección
     min_tracking_confidence=0.7       # Confianza mínima para seguimiento
 )
@@ -43,6 +43,8 @@ CLASSES = ["Piedra", "Papel", "Tijeras"]
 
 # Se activa la cámara web (índice 0 por defecto)
 cap = cv2.VideoCapture(0)
+
+scaler = joblib.load("./Ej2/scaler.pkl")
 
 while True:
     ret, frame = cap.read()
@@ -77,7 +79,6 @@ while True:
                 landmarks.extend([lm.x, lm.y])
 
             # Convertir a array NumPy y dar forma (1, 42)
-            scaler = joblib.load("./Ej2/scaler.pkl")
             X = np.array(landmarks).reshape(1, -1)
             X = scaler.transform(X)                 # IMPORTANTE: Usar el mismo scaler del entrenamiento
  
