@@ -2,120 +2,123 @@ import cv2
 import mediapipe as mp
 import numpy as np
 import tensorflow as tf
-from sklearn.preprocessing import StandardScaler
 import joblib
 
 # ============================================================
 # CARGA DEL MODELO ENTRENADO
 # ============================================================
 
-# Se carga el modelo previamente entrenado y guardado como "rps_model.keras"
-# Este modelo fue entrenado con las coordenadas de los landmarks de la mano.
-model = tf.keras.models.load_model("./Ej2/rps_model.keras")
+model = tf.keras.models.load_model("./rps_model.keras")
+scaler = joblib.load("./scaler.pkl")
 
 # ============================================================
 # CONFIGURACIÓN DE MEDIAPIPE HANDS
 # ============================================================
 
-# MediaPipe Hands es el modelo de detección y seguimiento de manos de Google.
-# Permite obtener 21 puntos clave (landmarks) por cada mano detectada.
 mp_hands = mp.solutions.hands
 mp_drawing = mp.solutions.drawing_utils
 
-# Inicialización del detector de manos
 hands = mp_hands.Hands(
-    static_image_mode=False,          # Detección continua en video
-    max_num_hands=2,                  # Detectar solo una mano
-    min_detection_confidence=0.7,     # Confianza mínima para detección
-    min_tracking_confidence=0.7       # Confianza mínima para seguimiento
+    static_image_mode=False,
+    max_num_hands=2,
+    min_detection_confidence=0.7,
+    min_tracking_confidence=0.7
 )
 
 # ============================================================
-# DEFINICIÓN DE CLASES
+# DEFINICIÓN DE CLASES Y COLORES
 # ============================================================
 
-# Las tres categorías del juego
 CLASSES = ["Piedra", "Papel", "Tijeras"]
+
+# Colores asociados a cada mano detectada (BGR)
+HAND_COLORS = [
+    (100, 30, 30),
+    (30, 30, 110)
+]
 
 # ============================================================
 # CAPTURA DE VIDEO EN TIEMPO REAL
 # ============================================================
 
-# Se activa la cámara web (índice 0 por defecto)
 cap = cv2.VideoCapture(0)
-
-scaler = joblib.load("./Ej2/scaler.pkl")
 
 while True:
     ret, frame = cap.read()
     if not ret:
-        break  # Si no se obtiene imagen, se interrumpe el bucle
+        break
 
-    # Espejar la imagen para que se vea como un reflejo (más intuitivo)
     frame = cv2.flip(frame, 1)
     h, w, _ = frame.shape
-
-    # MediaPipe requiere imágenes en formato RGB
     rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     results = hands.process(rgb)
 
-    # Texto por defecto si no se detecta mano
-    prediction_text = "Esperando mano..."
-
-    # ========================================================
-    # DETECCIÓN DE MANO Y CLASIFICACIÓN
-    # ========================================================
+    predictions = []  # almacenará predicciones por mano
 
     if results.multi_hand_landmarks:
-        for hand_landmarks in results.multi_hand_landmarks:
-            # Dibujar los landmarks y conexiones sobre la imagen
+        for i, hand_landmarks in enumerate(results.multi_hand_landmarks):
+            color = HAND_COLORS[i % len(HAND_COLORS)]
+
+            # Dibujar landmarks y conexiones con el color asignado
             mp_drawing.draw_landmarks(
-                frame, hand_landmarks, mp_hands.HAND_CONNECTIONS
+                frame,
+                hand_landmarks,
+                mp_hands.HAND_CONNECTIONS,
+                mp_drawing.DrawingSpec(color=color, thickness=2, circle_radius=3),
+                mp_drawing.DrawingSpec(color=color, thickness=2)
             )
 
-            # Extraer las coordenadas normalizadas (x, y) de los 21 puntos
-            landmarks = []
-            for lm in hand_landmarks.landmark:
-                landmarks.extend([lm.x, lm.y])
+            # Extraer coordenadas (x, y) de los 21 puntos
+            landmarks = np.array([[lm.x, lm.y] for lm in hand_landmarks.landmark])
 
-            # Convertir a array NumPy y dar forma (1, 42)
-            X = np.array(landmarks).reshape(1, -1)
-            X = scaler.transform(X)                 # IMPORTANTE: Usar el mismo scaler del entrenamiento
- 
-            # Realizar predicción con el modelo entrenado
-            prediction = model.predict(X)
-            pred_class = np.argmax(prediction)  # Clase con mayor probabilidad
-            prob = np.max(prediction)           # Nivel de confianza
+            # Normalización espacial idéntica al dataset
+            base = landmarks[0]  # muñeca (landmark 0)
+            landmarks -= base
 
-            # Mostrar resultado si la confianza es alta
-            if prob > 0.7:
-                prediction_text = f"{CLASSES[pred_class]} ({prob*100:.1f}%)"
+            max_range = np.max(np.linalg.norm(landmarks, axis=1))
+            if max_range > 0:
+                landmarks /= max_range
+
+            # Aplanar para el modelo
+            coords = landmarks.flatten().reshape(1, -1)
+
+            # Escalar con el StandardScaler entrenado
+            X = scaler.transform(coords)
+
+            # Predicción
+            prediction = model.predict(X, verbose=0)
+            pred_class = np.argmax(prediction)
+            prob = np.max(prediction)
+            predictions.append((i, pred_class, prob, color))
+
+    # ========================================================
+    # VISUALIZACIÓN DE RESULTADOS
+    # ========================================================
+
+    font_scale = 0.8
+    thickness = 2
+
+    if predictions:
+        for i, pred_class, prob, color in predictions:
+            text = f"{CLASSES[pred_class]} ({prob*100:.1f}%)" if prob > 0.7 else "Inseguro"
+
+            # Determinar posición del texto
+            if i == 0:
+                position = (10, 40)              # esquina superior izquierda
             else:
-                prediction_text = "Inseguro"
+                position = (w - 250, 40)         # esquina superior derecha
 
-    # ========================================================
-    # VISUALIZACIÓN EN PANTALLA
-    # ========================================================
+            cv2.putText(frame, text, position,
+                        cv2.FONT_HERSHEY_SIMPLEX, font_scale, color, thickness)
 
-    # Mostrar el texto de la predicción sobre el frame
-    cv2.putText(
-        frame, prediction_text,
-        (10, 40),
-        cv2.FONT_HERSHEY_SIMPLEX, 1.0,
-        (255, 255, 255), 3
-    )
+    else:
+        cv2.putText(frame, "Esperando manos...", (10, 40),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
 
-    # Mostrar ventana con el resultado
     cv2.imshow("Piedra, Papel o Tijeras", frame)
 
-    # Salir del bucle si se presiona 'q'
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
-# ============================================================
-# LIBERAR RECURSOS
-# ============================================================
-
-# Cerrar cámara y ventana al finalizar
 cap.release()
 cv2.destroyAllWindows()

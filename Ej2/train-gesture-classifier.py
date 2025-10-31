@@ -8,13 +8,17 @@ from sklearn.model_selection import train_test_split
 import joblib
 
 # ============================================================
-# CARGA Y PREPROCESAMIENTO DEL DATASET
+# CARGA DEL DATASET
 # ============================================================
 
 X = np.load("dataset/rps_dataset.npy")
 y = np.load("dataset/rps_labels.npy")
 
 print("Dataset cargado:", X.shape, y.shape)
+
+# ============================================================
+# PREPROCESAMIENTO DEL DATASET
+# ============================================================
 
 scaler = StandardScaler()
 X = scaler.fit_transform(X)
@@ -76,4 +80,4 @@ history = model.fit(
 # ============================================================
 
 model.save("rps_model.keras")
-print("✅ Modelo entrenado y guardado como rps_model.keras")
+print("Modelo entrenado y guardado como rps_model.keras")
