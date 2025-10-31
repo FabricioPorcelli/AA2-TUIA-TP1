@@ -72,10 +72,21 @@ while True:
                 frame, hand_landmarks, mp_hands.HAND_CONNECTIONS
             )
 
-            # Extrae las coordenadas normalizadas (x, y) de los 21 puntos de la mano
-            coords = []
-            for lm in hand_landmarks.landmark:
-                coords.extend([lm.x, lm.y])  # agrega 42 valores (x1,y1,x2,y2,...)
+            # Extraer coordenadas (x, y) de los 21 landmarks
+            landmarks = np.array([[lm.x, lm.y] for lm in hand_landmarks.landmark])
+
+            # --- Normalización espacial ---
+            # Centramos la mano restando el punto medio o la muñeca (landmark 0)
+            base = landmarks[0]  # o    landmarks.mean(axis=0) para usar el centro
+            landmarks -= base
+
+            # Escalamos por el rango máximo (invariante a tamaño)
+            max_range = np.max(np.linalg.norm(landmarks, axis=1))
+            if max_range > 0:
+                landmarks /= max_range
+
+            # Aplanamos para obtener el vector de entrada (42 valores)
+            coords = landmarks.flatten().tolist()
 
             # Muestra instrucciones en pantalla
             cv2.putText(frame, "0=Piedra | 1=Papel | 2=Tijeras | q=Salir",
@@ -98,7 +109,7 @@ while True:
                 # Guarda los arrays como archivos .npy en la carpeta dataset
                 np.save(os.path.join(DATA_PATH, "rps_dataset.npy"), np.array(data))
                 np.save(os.path.join(DATA_PATH, "rps_labels.npy"), np.array(labels))
-                print("✅ Dataset guardado en carpeta 'dataset'")
+                print("Dataset guardado en carpeta 'dataset'")
 
                 # Libera la cámara y cierra las ventanas
                 cap.release()
